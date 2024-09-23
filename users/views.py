@@ -27,13 +27,13 @@ class GoogleLoginCallback(APIView):
         the JWT tokens there - and store them in the state
         """
 
-        code = request.GET.get("code")
+        code = request.GET.get('code')
 
         if code is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        token_endpoint_url = urljoin("http://localhost:8000", reverse("google_login"))
-        response = requests.post(url=token_endpoint_url, data={"code": code})
+        token_endpoint_url = urljoin('http://localhost:8000', reverse('google_login'))
+        response = requests.post(url=token_endpoint_url, data={'code': code})
         print(response)
         return Response(response.json(), status=status.HTTP_200_OK)
 
@@ -44,8 +44,8 @@ class LoginPage(View):
             request,
             'login.html',
             {
-                "google_callback_uri": settings.GOOGLE_OAUTH_CALLBACK_URL,
-                "google_client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+                'google_callback_uri': settings.GOOGLE_OAUTH_CALLBACK_URL,
+                'google_client_id': settings.GOOGLE_OAUTH_CLIENT_ID,
             },
         )
 
@@ -54,4 +54,4 @@ class ProtectedView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
-        return Response({"message": "You are authenticated!"})
+        return Response({'message': 'You are authenticated!'})
