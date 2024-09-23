@@ -7,8 +7,8 @@ from rest_framework_simplejwt.views import (
 from users.views import LoginPage, GoogleLogin, GoogleLoginCallback, ProtectedView
 
 urlpatterns = [
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/v1/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('login', LoginPage.as_view(), name='login'),
     re_path(r'^api/v1/auth/accounts/', include('allauth.urls')),
     path('api/v1/auth/registration/', include('dj_rest_auth.registration.urls')),
