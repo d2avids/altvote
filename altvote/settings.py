@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
 ]
 INSTALLED_APPS += [
-    'users.apps.UsersConfig'
+    'users.apps.UsersConfig',
+    'polls.apps.PollsConfig'
 ]
 
 MIDDLEWARE = [
