@@ -16,6 +16,7 @@ dj-rest-auth = {extras = ["with-social"], version = "6.0.0"}
 python-dotenv = "^1.0.1"
 drf-spectacular = "^0.27.2"
 pillow = "^10.4.0"
+drf-extra-fields = "^3.7.0"
 
 
 [build-system]
