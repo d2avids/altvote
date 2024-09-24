@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from drf_extra_fields.fields import Base64ImageField
-from polls.models import Category, Option, Poll, PollCategory
+from polls.models import Category, Comment, Option, Poll, PollCategory, SimpleVote
 from users.models import User
 
 
@@ -89,3 +89,28 @@ class PollSerializer(serializers.ModelSerializer):
             setattr(instance, key, val)
         instance.save()
         return instance
+
+
+class SimpleVoteSerializer(serializers.ModelSerializer):
+    option = serializers.PrimaryKeyRelatedField(queryset=Option.objects.all())
+
+    class Meta:
+        model = SimpleVote
+        fields = ('id', 'author', 'option', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'author', 'created_at', 'updated_at')
+
+    def validate_option(self, option):
+        poll = self.instance.poll if self.instance else self.context['poll']
+
+        if option.poll != poll:
+            raise serializers.ValidationError('This option is not available for this poll.')
+
+        return option
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = AuthorSerializer(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ('id', 'author', 'content', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
