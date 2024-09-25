@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from drf_extra_fields.fields import Base64ImageField
 from polls.models import Category, Comment, Option, Poll, PollCategory, SimpleVote
+from polls.utils import poll_end_datetime_passed
 from users.models import User
 
 
@@ -17,7 +18,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class OptionSerializer(serializers.ModelSerializer):
-    image = Base64ImageField()
+    image = Base64ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Option
@@ -106,6 +107,18 @@ class SimpleVoteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('This option is not available for this poll.')
 
         return option
+
+    def validate(self, attrs):
+        poll = self.context['poll']
+
+        if SimpleVote.objects.filter(poll=poll, author=self.context['author']).exists():
+            raise serializers.ValidationError({'error': 'You have already voted for this poll.'})
+
+        if poll_end_datetime_passed(poll):
+            raise serializers.ValidationError({'error': 'The poll has been finished.'})
+
+        return attrs
+
 
 class CommentSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)

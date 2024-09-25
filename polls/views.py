@@ -34,7 +34,12 @@ class SimpleVoteViewSet(viewsets.ModelViewSet):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context.update({'poll': Poll.objects.get(pk=self.kwargs['poll_pk'])})
+        context.update(
+            {
+                'poll': Poll.objects.get(pk=self.kwargs['poll_pk']),
+                'author': self.request.user
+            }
+        )
         return context
 
     def get_queryset(self):
