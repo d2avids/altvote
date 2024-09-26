@@ -142,6 +142,10 @@ class RankedVote(BaseVote):
     points = models.IntegerField(
         verbose_name='Points'
     )
+    is_preferential = models.BooleanField(
+        verbose_name='Preferential',
+        default=False
+    )
 
     class Meta:
         verbose_name = 'Ranked Vote'

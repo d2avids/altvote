@@ -1,9 +1,13 @@
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
 
-from polls.models import Category, Comment, Poll, SimpleVote, PollCategory
-from polls.serializers import CategorySerializer, CommentSerializer, PollSerializer, SimpleVoteSerializer
+from polls.mixins import ListCreateMixin
+from polls.models import Category, Comment, Poll, SimpleVote, PollCategory, RankedVote
+from polls.serializers import CategorySerializer, CommentSerializer, PollSerializer, SimpleVoteSerializer, \
+    RankedVoteReadSerializer, RankedVoteWriteSerializer
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -27,28 +31,82 @@ class PollViewSet(viewsets.ModelViewSet):
         author = self.request.user
         serializer.save(author=author)
 
+    @action(
+        detail=True,
+        methods=['DELETE'],
+        url_path='users_simple_votes',
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def destroy_simple_votes(self, request, pk=None):
+        """Deletes all User's Simple Votes for a given Poll."""
+        SimpleVote.objects.filter(
+            poll_id=pk, author=self.request.user
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-class SimpleVoteViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    @action(
+        detail=True,
+        methods=['DELETE'],
+        url_path='users_ranked_votes',
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def destroy_ranked_votes(self, request, pk=None):
+        """Deletes all User's Ranked Votes for a given Poll."""
+        RankedVote.objects.filter(
+            poll_id=pk, author=self.request.user, is_preferential=False
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=['DELETE'],
+        url_path='users_preferential_votes',
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def destroy_preferential_votes(self, request, pk=None):
+        """Deletes all User's Preferential Votes for a given Poll."""
+        RankedVote.objects.filter(
+            poll_id=pk, author=self.request.user, is_preferential=True
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SimpleVoteViewSet(ListCreateMixin):
+    """Manages current user's Simple Votes."""
     serializer_class = SimpleVoteSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        return SimpleVote.objects.filter(poll_id=self.kwargs.get('poll_pk'), author=self.request.user)
+
+    def perform_create(self, serializer):
+        poll = get_object_or_404(Poll, pk=self.kwargs.get('poll_pk'))
+        author = self.request.user
+        serializer.save(author=author, poll=poll)
+
+
+class RankedVoteViewSet(ListCreateMixin):
+    """Manages current user's Ranked and Preferential Votes."""
+    permission_classes = (permissions.IsAuthenticated,)
+    # TODO: filter is_preferential
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context.update(
             {
                 'poll': Poll.objects.get(pk=self.kwargs['poll_pk']),
-                'author': self.request.user
+                'author': self.request.user,
             }
         )
         return context
 
-    def get_queryset(self):
-        return SimpleVote.objects.filter(poll_id=self.kwargs.get('poll_pk'))
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return RankedVoteReadSerializer
+        return RankedVoteWriteSerializer
 
-    def perform_create(self, serializer):
-        poll = get_object_or_404(Poll, pk=self.kwargs.get('poll_pk'))
-        author = self.request.user
-        serializer.save(author=author, poll=poll)
+    def get_queryset(self):
+        return RankedVote.objects.filter(poll_id=self.kwargs.get('poll_pk'), author=self.request.user)
 
 
 class CommentViewSet(viewsets.ModelViewSet):

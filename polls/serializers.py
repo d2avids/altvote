@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from drf_extra_fields.fields import Base64ImageField
-from polls.models import Category, Comment, Option, Poll, PollCategory, SimpleVote
+from polls.models import Category, Comment, Option, Poll, PollCategory, SimpleVote, RankedVote
 from polls.utils import poll_end_datetime_passed
 from users.models import User
 
@@ -97,8 +97,8 @@ class SimpleVoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SimpleVote
-        fields = ('id', 'author', 'option', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'author', 'created_at', 'updated_at')
+        fields = ('id', 'option', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
 
     def validate_option(self, option):
         poll = self.instance.poll if self.instance else self.context['poll']
@@ -111,13 +111,105 @@ class SimpleVoteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         poll = self.context['poll']
 
-        if SimpleVote.objects.filter(poll=poll, author=self.context['author']).exists():
+        if poll_end_datetime_passed(poll):
+            raise serializers.ValidationError({'error': 'The poll has been finished.'})
+
+        if SimpleVote.objects.filter(
+                poll=poll, author=self.context['author']
+        ).exists():
             raise serializers.ValidationError({'error': 'You have already voted for this poll.'})
+
+        return attrs
+
+
+class RankedVoteOptionSerializer(serializers.ModelSerializer):
+    option = serializers.PrimaryKeyRelatedField(queryset=Option.objects.all())
+    points = serializers.IntegerField()
+
+    class Meta:
+        model = RankedVote
+        fields = ('option', 'points', 'is_preferential', 'created_at', 'updated_at')
+        read_only_fields = ('created_at', 'updated_at')
+
+
+class RankedVoteReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RankedVote
+        fields = ('id', 'option', 'points', 'created_at', 'updated_at', 'is_preferential')
+
+
+class RankedVoteWriteSerializer(serializers.Serializer):
+    votes = RankedVoteOptionSerializer(many=True)
+    is_preferential = serializers.BooleanField()
+
+    def validate(self, attrs):
+        poll = self.context['poll']
 
         if poll_end_datetime_passed(poll):
             raise serializers.ValidationError({'error': 'The poll has been finished.'})
 
+        poll_options = list(poll.options.all())
+
+        is_preferential = attrs['is_preferential']
+        if is_preferential:
+            preferential_points = list(range(1, len(poll_options) + 1))
+
+        for ranked_option in attrs['votes']:
+            option = ranked_option.get('option')
+            points = ranked_option.get('points')
+
+            if RankedVote.objects.filter(
+                    poll=poll,
+                    author=self.context['author'],
+                    option=option,
+                    is_preferential=is_preferential
+            ).exists():
+                raise serializers.ValidationError({'error': 'You have already voted for this option.'})
+
+            if option not in poll_options:
+                raise serializers.ValidationError(
+                    {'options': f'The {option.id} option is duplicated or not available for this poll.'}
+                )
+            poll_options.remove(option)
+
+            if is_preferential:
+                if points not in preferential_points:
+                    raise serializers.ValidationError(
+                        {
+                            'options': f'The {points} points value for {option.id} '
+                                       f'option is duplicated or not available.'
+                        }
+                    )
+                preferential_points.remove(points)
+
+        if poll_options:
+            raise serializers.ValidationError(
+                {'options': 'Not all available options are provided in the vote for this poll.'}
+            )
+
         return attrs
+
+    def create(self, validated_data):
+        poll = self.context['poll']
+        author = self.context['author']
+        is_preferential = self.validated_data['is_preferential']
+
+        votes = [
+            RankedVote(
+                poll=poll,
+                author=author,
+                option=vote_data['option'],
+                points=vote_data['points'],
+                is_preferential=is_preferential,
+            )
+            for vote_data in validated_data['votes']
+        ]
+        RankedVote.objects.bulk_create(votes)
+
+        return {
+            'votes': votes,
+            'is_preferential': is_preferential
+        }
 
 
 class CommentSerializer(serializers.ModelSerializer):
