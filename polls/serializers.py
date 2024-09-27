@@ -231,9 +231,14 @@ class CommentWriteSerializer(serializers.ModelSerializer):
         fields = ('id', 'parent', 'content', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
 
-    def validate(self, data):
+    def validate(self, attrs):
         poll_id = int(self.context['poll_id'])
-        if data.get('parent'):
-            if data['parent'].poll_id != poll_id:
+
+        if attrs.get('parent'):
+            if attrs['parent'].poll_id != poll_id:
                 raise serializers.ValidationError('Parent comment must belong to the same poll.')
-        return data
+
+            if attrs['parent'].parent:
+                raise serializers.ValidationError('Child comment must only belong to a top-level comment.')
+
+        return attrs
