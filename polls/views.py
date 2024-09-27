@@ -6,8 +6,8 @@ from rest_framework.decorators import action
 
 from polls.mixins import ListCreateMixin
 from polls.models import Category, Comment, Poll, SimpleVote, PollCategory, RankedVote
-from polls.serializers import CategorySerializer, CommentSerializer, PollSerializer, SimpleVoteSerializer, \
-    RankedVoteReadSerializer, RankedVoteWriteSerializer
+from polls.serializers import CategorySerializer, PollSerializer, SimpleVoteSerializer, \
+    RankedVoteReadSerializer, RankedVoteWriteSerializer, CommentReadSerializer, CommentWriteSerializer
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -111,11 +111,21 @@ class RankedVoteViewSet(ListCreateMixin):
 
 class CommentViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = CommentSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return CommentReadSerializer
+        return CommentWriteSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({'poll_id': self.kwargs['poll_pk']})
+        return context
 
     def get_queryset(self):
         return Comment.objects.filter(
-            poll_id=self.kwargs.get('poll_pk')
+            poll_id=self.kwargs.get('poll_pk'),
+            parent__isnull=True
         ).select_related('author')
 
     def perform_create(self, serializer):

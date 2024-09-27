@@ -212,10 +212,28 @@ class RankedVoteWriteSerializer(serializers.Serializer):
         }
 
 
-class CommentSerializer(serializers.ModelSerializer):
+class CommentReadSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)
+    replies = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
-        fields = ('id', 'author', 'content', 'created_at', 'updated_at')
+        fields = ('id', 'author', 'parent', 'content', 'created_at', 'updated_at', 'replies')
+
+    def get_replies(self, obj):
+        replies = obj.replies.all()
+        return CommentReadSerializer(replies, many=True).data
+
+
+class CommentWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ('id', 'parent', 'content', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def validate(self, data):
+        poll_id = int(self.context['poll_id'])
+        if data.get('parent'):
+            if data['parent'].poll_id != poll_id:
+                raise serializers.ValidationError('Parent comment must belong to the same poll.')
+        return data

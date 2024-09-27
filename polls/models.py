@@ -160,13 +160,21 @@ class Comment(models.Model):
         verbose_name='Author',
         on_delete=models.CASCADE,
         related_name='comments',
-        to='users.User',
+        to='users.User'
     )
     poll = models.ForeignKey(
         verbose_name='Poll',
         on_delete=models.CASCADE,
         related_name='comments',
         to='polls.Poll'
+    )
+    parent = models.ForeignKey(
+        verbose_name='Parent Comment',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='replies',
+        to='self'
     )
     content = models.TextField(verbose_name='Content')
     created_at = models.DateTimeField(
@@ -184,5 +192,3 @@ class Comment(models.Model):
 
     def __str__(self) -> str:
         return f'{self.author} comments on {self.poll}: "{self.content[:20]}..."'
-
-
