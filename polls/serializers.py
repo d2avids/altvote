@@ -42,11 +42,13 @@ class PollSerializer(serializers.ModelSerializer):
             'end_datetime', 
             'categories',
             'options',
+            'comments_count',
             'created_at', 
             'updated_at', 
             'is_confirmed'
         )
         read_only_fields = (
+            'comments_count',
             'created_at', 
             'updated_at', 
             'is_confirmed'
@@ -218,7 +220,17 @@ class CommentReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('id', 'author', 'parent', 'content', 'created_at', 'updated_at', 'replies')
+        fields = (
+            'id',
+            'author',
+            'parent',
+            'content',
+            'likes_count',
+            'dislikes_count',
+            'created_at',
+            'updated_at',
+            'replies'
+        )
 
     def get_replies(self, obj):
         replies = obj.replies.all()
@@ -228,8 +240,12 @@ class CommentReadSerializer(serializers.ModelSerializer):
 class CommentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('id', 'parent', 'content', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = (
+            'id', 'parent', 'content', 'likes_count', 'dislikes_count', 'created_at', 'updated_at'
+        )
+        read_only_fields = (
+            'id', 'created_at', 'updated_at', 'likes_count', 'dislikes_count'
+        )
 
     def validate(self, attrs):
         poll_id = int(self.context['poll_id'])

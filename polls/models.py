@@ -48,6 +48,10 @@ class Poll(models.Model):
         verbose_name='Confirmed',
         default=False
     )
+    comments_count = models.PositiveIntegerField(
+        verbose_name='Comments Count',
+        default=0
+    )
 
     class Meta:
         verbose_name = 'Poll'
@@ -139,7 +143,7 @@ class SimpleVote(BaseVote):
 
 
 class RankedVote(BaseVote):
-    points = models.IntegerField(
+    points = models.PositiveSmallIntegerField(
         verbose_name='Points'
     )
     is_preferential = models.BooleanField(
@@ -185,6 +189,14 @@ class Comment(models.Model):
         verbose_name='Updated At',
         auto_now=True
     )
+    likes_count = models.PositiveIntegerField(
+        verbose_name='Likes Count',
+        default=0
+    )
+    dislikes_count = models.PositiveIntegerField(
+        verbose_name='Dislikes Count',
+        default=0
+    )
 
     class Meta:
         verbose_name = 'Comment'
@@ -192,3 +204,47 @@ class Comment(models.Model):
 
     def __str__(self) -> str:
         return f'{self.author} comments on {self.poll}: "{self.content[:20]}..."'
+
+
+class CommentLike(models.Model):
+    author = models.ForeignKey(
+        verbose_name='Author',
+        on_delete=models.CASCADE,
+        related_name='comments_likes',
+        to='users.User'
+    )
+    comment = models.ForeignKey(
+        verbose_name='Comment',
+        on_delete=models.CASCADE,
+        related_name='likes',
+        to='polls.Comment'
+    )
+
+    class Meta:
+        verbose_name = 'Comment Likes'
+        verbose_name_plural = 'Comments Likes'
+
+    def __str__(self) -> str:
+        return f'{self.author} likes {self.comment.id} comment'
+
+
+class CommentDislike(models.Model):
+    author = models.ForeignKey(
+        verbose_name='Author',
+        on_delete=models.CASCADE,
+        related_name='comments_dislikes',
+        to='users.User'
+    )
+    comment = models.ForeignKey(
+        verbose_name='Comment',
+        on_delete=models.CASCADE,
+        related_name='dislikes',
+        to='polls.Comment'
+    )
+
+    class Meta:
+        verbose_name = 'Comment Dislikes'
+        verbose_name_plural = 'Comments Dislikes'
+
+    def __str__(self) -> str:
+        return f'{self.author} dislikes {self.comment.id} comment'

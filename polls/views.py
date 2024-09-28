@@ -8,6 +8,7 @@ from polls.mixins import ListCreateMixin
 from polls.models import Category, Comment, Poll, SimpleVote, PollCategory, RankedVote
 from polls.serializers import CategorySerializer, PollSerializer, SimpleVoteSerializer, \
     RankedVoteReadSerializer, RankedVoteWriteSerializer, CommentReadSerializer, CommentWriteSerializer
+from polls.tasks import on_like, on_dislike, on_new_comment, on_destroy_comment
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -129,6 +130,35 @@ class CommentViewSet(viewsets.ModelViewSet):
         ).select_related('author')
 
     def perform_create(self, serializer):
-        poll = get_object_or_404(Poll, pk=self.kwargs.get('poll_pk'))
-        author = self.request.user
-        serializer.save(author=author, poll=poll)
+        poll_pk = self.kwargs.get('poll_pk')
+        poll = get_object_or_404(Poll, pk=poll_pk)
+        on_new_comment.delay(poll_pk=poll_pk)
+        serializer.save(author=self.request.user, poll=poll)
+
+    def perform_destroy(self, instance):
+        on_destroy_comment.delay(poll_pk=self.kwargs.get('poll_pk'))
+        instance.delete()
+
+    @action(
+        detail=True,
+        methods=['POST'],
+        url_path='likes',
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def likes(self, request, pk=None):
+        poll_id = self.kwargs.get('poll_pk')
+        get_object_or_404(Comment, pk=pk, poll_id=poll_id)
+        on_like.delay(comment_pk=pk, user_pk=self.request.user.id)
+        return Response(status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=['POST'],
+        url_path='dislikes',
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def dislikes(self, request, pk=None):
+        poll_id = self.kwargs.get('poll_pk')
+        get_object_or_404(Comment, pk=pk, poll_id=poll_id)
+        on_dislike.delay(comment_pk=pk, user_pk=self.request.user.id)
+        return Response(status=status.HTTP_201_CREATED)
