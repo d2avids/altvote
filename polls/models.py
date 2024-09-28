@@ -89,6 +89,19 @@ class Option(models.Model):
         blank=True,
         null=True
     )
+    simple_votes = models.PositiveIntegerField(
+        verbose_name='Simple Votes',
+        default=0
+    )
+    ranked_points = models.PositiveIntegerField(
+        verbose_name='Ranked Points',
+        default=0
+    )
+    preferential_votes = models.JSONField(
+        verbose_name='Preferential Votes',
+        blank=True,
+        null=True
+    )
 
     class Meta:
         verbose_name = 'Poll Option'

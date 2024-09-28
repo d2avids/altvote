@@ -8,7 +8,7 @@ from polls.mixins import ListCreateMixin
 from polls.models import Category, Comment, Poll, SimpleVote, PollCategory, RankedVote
 from polls.serializers import CategorySerializer, PollSerializer, SimpleVoteSerializer, \
     RankedVoteReadSerializer, RankedVoteWriteSerializer, CommentReadSerializer, CommentWriteSerializer
-from polls.tasks import on_like, on_dislike, on_new_comment, on_destroy_comment
+from polls.tasks import on_like, on_dislike, on_ranked_votes, on_comment, on_simple_vote
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -40,9 +40,12 @@ class PollViewSet(viewsets.ModelViewSet):
     )
     def destroy_simple_votes(self, request, pk=None):
         """Deletes all User's Simple Votes for a given Poll."""
-        SimpleVote.objects.filter(
+        simple_votes = SimpleVote.objects.filter(
             poll_id=pk, author=self.request.user
-        ).delete()
+        )
+        for simple_vote in simple_votes:
+            on_simple_vote.delay(option_pk=simple_vote.option.id, created=False)
+        simple_votes.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -53,9 +56,14 @@ class PollViewSet(viewsets.ModelViewSet):
     )
     def destroy_ranked_votes(self, request, pk=None):
         """Deletes all User's Ranked Votes for a given Poll."""
-        RankedVote.objects.filter(
+        ranked_votes = RankedVote.objects.filter(
             poll_id=pk, author=self.request.user, is_preferential=False
-        ).delete()
+        )
+        if ranked_votes:
+            options_list = ranked_votes.values_list('option_id', 'points', flat=True)
+            options_dict = {option[0]: option[1] for option in options_list}
+            on_ranked_votes.delay(options_dict=options_dict, created=False, ranked=True)
+        ranked_votes.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -66,9 +74,14 @@ class PollViewSet(viewsets.ModelViewSet):
     )
     def destroy_preferential_votes(self, request, pk=None):
         """Deletes all User's Preferential Votes for a given Poll."""
-        RankedVote.objects.filter(
+        preferential_votes = RankedVote.objects.filter(
             poll_id=pk, author=self.request.user, is_preferential=True
-        ).delete()
+        )
+        if preferential_votes:
+            options_list = preferential_votes.values_list('option_id', 'points', flat=True)
+            options_dict = {option[0]: option[1] for option in options_list}
+            on_ranked_votes.delay(options_dict=options_dict, created=False, ranked=False)
+        preferential_votes.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -132,11 +145,11 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         poll_pk = self.kwargs.get('poll_pk')
         poll = get_object_or_404(Poll, pk=poll_pk)
-        on_new_comment.delay(poll_pk=poll_pk)
+        on_comment.delay(poll_pk=poll_pk, created=True)
         serializer.save(author=self.request.user, poll=poll)
 
     def perform_destroy(self, instance):
-        on_destroy_comment.delay(poll_pk=self.kwargs.get('poll_pk'))
+        on_comment.delay(poll_pk=self.kwargs.get('poll_pk'), created=False)
         instance.delete()
 
     @action(

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from drf_extra_fields.fields import Base64ImageField
 from polls.models import Category, Comment, Option, Poll, PollCategory, SimpleVote, RankedVote
 from polls.utils import poll_end_datetime_passed
+from polls.tasks import on_ranked_votes, on_simple_vote
 from users.models import User
 
 
@@ -101,6 +102,10 @@ class SimpleVoteSerializer(serializers.ModelSerializer):
         model = SimpleVote
         fields = ('id', 'option', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def create(self, validated_data):
+        on_simple_vote.delay(option_pk=validated_data['option'].id, created=True)
+        return super().create(validated_data)
 
     def validate_option(self, option):
         poll = self.instance.poll if self.instance else self.context['poll']
@@ -207,6 +212,9 @@ class RankedVoteWriteSerializer(serializers.Serializer):
             for vote_data in validated_data['votes']
         ]
         RankedVote.objects.bulk_create(votes)
+
+        options_points = {vote_data['option'].id: vote_data['points'] for vote_data in validated_data['votes']}
+        on_ranked_votes.delay(options_dict=options_points, created=True, ranked=True)
 
         return {
             'votes': votes,
