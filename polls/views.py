@@ -5,9 +5,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from polls.mixins import ListCreateMixin
-from polls.models import Category, Comment, Poll, SimpleVote, PollCategory, RankedVote
-from polls.serializers import CategorySerializer, PollSerializer, SimpleVoteSerializer, \
-    RankedVoteReadSerializer, RankedVoteWriteSerializer, CommentReadSerializer, CommentWriteSerializer
+from polls.models import Category, Comment, Poll, SimpleVote, PollCategory, RankedVote, CommentLike, CommentDislike
+from polls.serializers import (CategorySerializer, PollSerializer, SimpleVoteSerializer,
+                               RankedVoteReadSerializer, RankedVoteWriteSerializer,
+                               CommentReadSerializer, CommentWriteSerializer)
 from polls.tasks import on_like, on_dislike, on_ranked_votes, on_comment, on_simple_vote
 
 
@@ -140,7 +141,19 @@ class CommentViewSet(viewsets.ModelViewSet):
         return Comment.objects.filter(
             poll_id=self.kwargs.get('poll_pk'),
             parent__isnull=True
-        ).select_related('author')
+        ).select_related('author').prefetch_related(
+            'replies',
+            Prefetch(
+                'likes',
+                queryset=CommentLike.objects.filter(author=self.request.user),
+                to_attr='author_likes'
+            ),
+            Prefetch(
+                'dislikes',
+                queryset=CommentDislike.objects.filter(author=self.request.user),
+                to_attr='author_dislikes'
+            )
+        )
 
     def perform_create(self, serializer):
         poll_pk = self.kwargs.get('poll_pk')
@@ -158,9 +171,8 @@ class CommentViewSet(viewsets.ModelViewSet):
         url_path='likes',
         permission_classes=(permissions.IsAuthenticated,)
     )
-    def likes(self, request, pk=None):
-        poll_id = self.kwargs.get('poll_pk')
-        get_object_or_404(Comment, pk=pk, poll_id=poll_id)
+    def likes(self, request, pk=None, poll_pk=None):
+        get_object_or_404(Comment, pk=pk, poll_id=poll_pk)
         on_like.delay(comment_pk=pk, user_pk=self.request.user.id)
         return Response(status=status.HTTP_201_CREATED)
 
@@ -170,8 +182,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         url_path='dislikes',
         permission_classes=(permissions.IsAuthenticated,)
     )
-    def dislikes(self, request, pk=None):
-        poll_id = self.kwargs.get('poll_pk')
-        get_object_or_404(Comment, pk=pk, poll_id=poll_id)
+    def dislikes(self, request, pk=None, poll_pk=None):
+        get_object_or_404(Comment, pk=pk, poll_id=poll_pk)
         on_dislike.delay(comment_pk=pk, user_pk=self.request.user.id)
         return Response(status=status.HTTP_201_CREATED)
