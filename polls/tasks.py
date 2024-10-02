@@ -52,16 +52,16 @@ def on_like(comment_pk: int, user_pk: int):
     user = User.objects.get(pk=user_pk)
 
     try:
-        comment_like = CommentLike.objects.get(user=user, comment=comment)
+        comment_like = CommentLike.objects.get(author=user, comment=comment)
         comment_like.delete()
         comment.likes_count -= 1
         comment.save()
     except CommentLike.DoesNotExist:
 
         with suppress(ObjectDoesNotExist):
-            CommentDislike.objects.get(user=user, comment=comment).delete()
+            CommentDislike.objects.get(author=user, comment=comment).delete()
 
-        CommentLike.objects.create(user=user, comment=comment)
+        CommentLike.objects.create(author=user, comment=comment)
         comment.likes_count += 1
         comment.save()
 
@@ -72,16 +72,16 @@ def on_dislike(comment_pk: int, user_pk: int):
     user = User.objects.get(pk=user_pk)
 
     try:
-        comment_dislike = CommentDislike.objects.get(user=user, comment=comment)
+        comment_dislike = CommentDislike.objects.get(author=user, comment=comment)
         comment_dislike.delete()
         comment.dislikes_count -= 1
         comment.save()
     except CommentDislike.DoesNotExist:
 
         with suppress(ObjectDoesNotExist):
-            CommentLike.objects.get(user=user, comment=comment).delete()
+            CommentLike.objects.get(author=user, comment=comment).delete()
 
-        CommentDislike.objects.create(user=user, comment=comment)
+        CommentDislike.objects.create(author=user, comment=comment)
         comment.dislikes_count += 1
         comment.save()
 
