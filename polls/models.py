@@ -1,5 +1,7 @@
 from django.db import models
 
+# TODO: Unique together constraints
+
 
 class Category(models.Model):
     name = models.CharField(

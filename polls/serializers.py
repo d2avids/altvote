@@ -23,7 +23,14 @@ class OptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Option
-        fields = ('id', 'option', 'image')
+        fields = (
+            'id',
+            'option',
+            'image',
+            'simple_votes',
+            'ranked_points',
+            'preferential_votes'
+        )
 
 
 class PollSerializer(serializers.ModelSerializer):
@@ -225,6 +232,8 @@ class RankedVoteWriteSerializer(serializers.Serializer):
 class CommentReadSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)
     replies = serializers.SerializerMethodField()
+    liked_by_current_user = serializers.SerializerMethodField()
+    disliked_by_current_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -235,6 +244,8 @@ class CommentReadSerializer(serializers.ModelSerializer):
             'content',
             'likes_count',
             'dislikes_count',
+            'liked_by_current_user',
+            'disliked_by_current_user',
             'created_at',
             'updated_at',
             'replies'
@@ -243,6 +254,12 @@ class CommentReadSerializer(serializers.ModelSerializer):
     def get_replies(self, obj):
         replies = obj.replies.all()
         return CommentReadSerializer(replies, many=True).data
+
+    def get_liked_by_current_user(self, obj):
+        return hasattr(obj, 'author_likes') and len(obj.author_likes) > 0
+
+    def get_disliked_by_current_user(self, obj):
+        return hasattr(obj, 'author_dislikes') and len(obj.author_dislikes) > 0
 
 
 class CommentWriteSerializer(serializers.ModelSerializer):
